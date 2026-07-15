@@ -1,7 +1,130 @@
 <!DOCTYPE html>
-<html>
-<head><title>Tesla FSD Stats</title></head>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>My FSD Stats</title>
+<style>
+  :root{
+    --bg: #0a0c0f;
+    --panel: #12161b;
+    --line: #232a31;
+    --text: #e8ecef;
+    --dim: #7c8891;
+    --accent: #d9382e;
+    --good: #2fd67a;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{
+    margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family: 'SF Mono', ui-monospace, 'Roboto Mono', Menlo, monospace;
+    min-height:100vh;
+  }
+  .wrap{ max-width:480px; margin:0 auto; padding:32px 18px 48px; }
+
+  header{ margin-bottom:26px; text-align:center; }
+  .eyebrow{
+    font-size:11px; letter-spacing:.14em; color:var(--dim);
+    text-transform:uppercase; margin:0 0 6px;
+  }
+  h1{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size:24px; font-weight:600; margin:0; letter-spacing:-0.01em;
+  }
+
+  .hero{
+    background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:32px 20px; text-align:center; margin-bottom:16px;
+  }
+  .hero .pct{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size:64px; font-weight:700; color:var(--good); line-height:1;
+  }
+  .hero .pct .sign{ font-size:32px; margin-left:2px; }
+  .hero .label{
+    font-size:12px; color:var(--dim); text-transform:uppercase;
+    letter-spacing:.1em; margin-top:8px;
+  }
+
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .card{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px;
+  }
+  .card .label{ font-size:11px; color:var(--dim); letter-spacing:.06em; text-transform:uppercase; }
+  .card .value{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size:22px; margin-top:6px; font-weight:600;
+  }
+  .card .unit{ font-size:12px; color:var(--dim); margin-left:3px; }
+
+  .updated{
+    text-align:center; font-size:11px; color:var(--dim); margin-top:20px;
+  }
+
+  .empty{
+    text-align:center; color:var(--dim); font-size:13px; padding:40px 20px;
+  }
+
+  .refresh-note{
+    text-align:center; font-size:10.5px; color:var(--dim); margin-top:6px;
+  }
+</style>
+</head>
 <body>
-  <h1>Tesla FSD Stats — Coming Soon</h1>
+  <div class="wrap">
+    <header>
+      <p class="eyebrow">Nakra M3</p>
+      <h1>FSD Stats</h1>
+    </header>
+
+    <div id="content">
+      <div class="empty">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    async function loadStats() {
+      const content = document.getElementById('content');
+      try {
+        const res = await fetch('/api/tesla-stats');
+        const stats = await res.json();
+
+        if (!stats.percent && stats.percent !== 0) {
+          content.innerHTML = '<div class="empty">No data received yet — check that Teslemetry streaming is running.</div>';
+          return;
+        }
+
+        const updated = stats.updatedAt
+          ? new Date(stats.updatedAt).toLocaleString()
+          : 'unknown';
+
+        content.innerHTML = `
+          <div class="hero">
+            <div class="pct">${stats.percent}<span class="sign">%</span></div>
+            <div class="label">Miles Driven on FSD</div>
+          </div>
+          <div class="grid">
+            <div class="card">
+              <div class="label">FSD Miles</div>
+              <div class="value">${stats.selfDrivingMiles.toLocaleString(undefined, {maximumFractionDigits:1})}<span class="unit">mi</span></div>
+            </div>
+            <div class="card">
+              <div class="label">Total Miles</div>
+              <div class="value">${stats.milesSinceReset.toLocaleString(undefined, {maximumFractionDigits:1})}<span class="unit">mi</span></div>
+            </div>
+          </div>
+          <p class="updated">Last updated: ${updated}</p>
+          <p class="refresh-note">Updates automatically whenever your car reports new stats</p>
+        `;
+      } catch (err) {
+        content.innerHTML = '<div class="empty">Couldn\'t load stats right now.</div>';
+      }
+    }
+
+    loadStats();
+    // Refresh the view every 60s in case new data has arrived since page load
+    setInterval(loadStats, 60000);
+  </script>
 </body>
 </html>
