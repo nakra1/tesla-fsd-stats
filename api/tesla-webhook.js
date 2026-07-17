@@ -1,14 +1,21 @@
 // api/tesla-webhook.js
-// Receives Teslemetry's webhook POST and stores the latest FSD stats in Vercel KV.
+// Receives Teslemetry's webhook POST and stores the latest FSD stats in Redis (Upstash).
 //
 // Setup required in Vercel dashboard:
-//   1. Storage tab -> Create Database -> KV -> connect to this project
-//      (this auto-injects KV_REST_API_URL / KV_REST_API_TOKEN env vars)
+//   1. Storage tab -> Browse Storage -> Upstash -> create a Redis database ->
+//      connect it to this project. Check Settings -> Environment Variables
+//      afterward to confirm the exact injected variable names (commonly
+//      KV_REST_API_URL / KV_REST_API_TOKEN, but verify against your dashboard).
 //   2. Settings -> Environment Variables -> add WEBHOOK_SECRET (any random string
 //      you make up yourself) -> also paste that same string into Teslemetry's
 //      webhook "Authorization" header field when you configure it there.
 
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -22,10 +29,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data, createdAt, vin } = req.body;
+    console.log("Raw webhook body:", JSON.stringify(req.body));
+
+    const { data, createdAt, vin } = req.body || {};
 
     if (!data || !data.MilesSinceReset || !data.SelfDrivingMilesSinceReset) {
-      return res.status(400).json({ error: "Missing expected fields" });
+      console.log("Payload did not match expected shape. Full body logged above.");
+      return res.status(200).json({ ok: true, debug: "logged, but fields missing" });
     }
 
     const milesSinceReset = parseFloat(data.MilesSinceReset);
@@ -35,7 +45,7 @@ export default async function handler(req, res) {
         ? Math.round((selfDrivingMiles / milesSinceReset) * 1000) / 10
         : 0;
 
-    await kv.set("tesla:fsd-stats", {
+    await redis.set("tesla:fsd-stats", {
       milesSinceReset,
       selfDrivingMiles,
       percent,
