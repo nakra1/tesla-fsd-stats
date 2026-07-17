@@ -31,11 +31,18 @@ export default async function handler(req, res) {
   try {
     console.log("Raw webhook body:", JSON.stringify(req.body));
 
-    const { data, createdAt, vin } = req.body || {};
+    const { data, createdAt, vin, state } = req.body || {};
 
-    if (!data || !data.MilesSinceReset || !data.SelfDrivingMilesSinceReset) {
-      console.log("Payload did not match expected shape. Full body logged above.");
-      return res.status(200).json({ ok: true, debug: "logged, but fields missing" });
+    // Teslemetry also sends connectivity/state pings (e.g. {vin, createdAt, state:"online"})
+    // with no "data" field. These are normal and not an error — just acknowledge them.
+    if (!data) {
+      console.log("Connectivity/state ping received, no data fields — ignoring.");
+      return res.status(200).json({ ok: true, type: "state_ping" });
+    }
+
+    if (!data.MilesSinceReset || !data.SelfDrivingMilesSinceReset) {
+      console.log("Data payload missing expected fields:", JSON.stringify(data));
+      return res.status(200).json({ ok: true, debug: "data present but fields missing" });
     }
 
     const milesSinceReset = parseFloat(data.MilesSinceReset);
