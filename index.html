@@ -6,68 +6,64 @@
 <title>My FSD Stats</title>
 <style>
   :root{
-    --bg: #0a0c0f;
-    --panel: #12161b;
-    --line: #232a31;
-    --text: #e8ecef;
-    --dim: #7c8891;
-    --accent: #d9382e;
-    --good: #2fd67a;
+    --bg: #ffffff;
+    --panel: #f7f8fa;
+    --line: #e8eaed;
+    --text: #1c1e21;
+    --dim: #8a8f98;
+    --accent: #3d7bfb;
+    --track: #e5e8ee;
   }
   *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html,body{
     margin:0; padding:0; background:var(--bg); color:var(--text);
-    font-family: 'SF Mono', ui-monospace, 'Roboto Mono', Menlo, monospace;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     min-height:100vh;
   }
-  .wrap{ max-width:480px; margin:0 auto; padding:32px 18px 48px; }
+  .wrap{ max-width:480px; margin:0 auto; padding:32px 20px 48px; }
 
-  header{ margin-bottom:26px; text-align:center; }
+  header{ margin-bottom:8px; text-align:center; }
   .eyebrow{
-    font-size:11px; letter-spacing:.14em; color:var(--dim);
-    text-transform:uppercase; margin:0 0 6px;
-  }
-  h1{
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size:24px; font-weight:600; margin:0; letter-spacing:-0.01em;
+    font-size:12px; letter-spacing:.1em; color:var(--dim);
+    text-transform:uppercase; margin:0;
   }
 
-  .hero{
-    background:var(--panel); border:1px solid var(--line); border-radius:16px;
-    padding:32px 20px; text-align:center; margin-bottom:16px;
+  .gauge-wrap{
+    position:relative; width:100%; max-width:320px; margin:24px auto 8px;
+    display:flex; align-items:center; justify-content:center;
   }
-  .hero .pct{
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size:64px; font-weight:700; color:var(--good); line-height:1;
+  .gauge-center{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-52%);
+    text-align:center;
   }
-  .hero .pct .sign{ font-size:32px; margin-left:2px; }
-  .hero .label{
-    font-size:12px; color:var(--dim); text-transform:uppercase;
-    letter-spacing:.1em; margin-top:8px;
+  .gauge-pct{
+    font-size:56px; font-weight:600; color:var(--text); line-height:1;
+  }
+  .gauge-label{
+    font-size:13px; color:var(--dim); margin-top:6px;
+  }
+  .gauge-scale{
+    display:flex; justify-content:space-between; max-width:220px; margin:0 auto;
+    font-size:12px; color:var(--dim);
   }
 
-  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:28px; }
   .card{
-    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
     padding:16px;
   }
   .card .label{ font-size:11px; color:var(--dim); letter-spacing:.06em; text-transform:uppercase; }
   .card .value{
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size:22px; margin-top:6px; font-weight:600;
+    font-size:20px; margin-top:6px; font-weight:600;
   }
-  .card .unit{ font-size:12px; color:var(--dim); margin-left:3px; }
+  .card .unit{ font-size:12px; color:var(--dim); margin-left:3px; font-weight:400; }
 
   .updated{
-    text-align:center; font-size:11px; color:var(--dim); margin-top:20px;
+    text-align:center; font-size:12px; color:var(--dim); margin-top:22px;
   }
 
   .empty{
-    text-align:center; color:var(--dim); font-size:13px; padding:40px 20px;
-  }
-
-  .refresh-note{
-    text-align:center; font-size:10.5px; color:var(--dim); margin-top:6px;
+    text-align:center; color:var(--dim); font-size:14px; padding:60px 20px;
   }
 </style>
 </head>
@@ -75,7 +71,6 @@
   <div class="wrap">
     <header>
       <p class="eyebrow">Nakra M3</p>
-      <h1>FSD Stats</h1>
     </header>
 
     <div id="content">
@@ -84,6 +79,59 @@
   </div>
 
   <script>
+    function polarToCartesian(cx, cy, r, angleDeg) {
+      const rad = (angleDeg * Math.PI) / 180;
+      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    }
+
+    function describeArc(cx, cy, r, startAngle, endAngle) {
+      const start = polarToCartesian(cx, cy, r, startAngle);
+      const end = polarToCartesian(cx, cy, r, endAngle);
+      const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
+      return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+    }
+
+    const GAUGE_START = 135; // bottom-left
+    const GAUGE_SWEEP = 270; // degrees, ends bottom-right
+
+    function animateGauge(targetPercent) {
+      const path = document.getElementById('gauge-fill');
+      const pctText = document.getElementById('gauge-pct-text');
+      if (!path) return;
+
+      const duration = 900;
+      const startTime = performance.now();
+
+      function frame(now) {
+        const t = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+        const current = eased * targetPercent;
+        const endAngle = GAUGE_START + (GAUGE_SWEEP * current) / 100;
+        path.setAttribute('d', describeArc(100, 100, 82, GAUGE_START, Math.max(endAngle, GAUGE_START + 0.01)));
+        pctText.textContent = Math.round(current) + '%';
+        if (t < 1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    function buildGauge(percent) {
+      return `
+        <div class="gauge-wrap">
+          <svg width="280" height="280" viewBox="0 0 200 200">
+            <path d="${describeArc(100, 100, 82, GAUGE_START, GAUGE_START + GAUGE_SWEEP)}"
+                  fill="none" stroke="var(--track)" stroke-width="14" stroke-linecap="round"/>
+            <path id="gauge-fill" d="${describeArc(100, 100, 82, GAUGE_START, GAUGE_START)}"
+                  fill="none" stroke="var(--accent)" stroke-width="14" stroke-linecap="round"/>
+          </svg>
+          <div class="gauge-center">
+            <div class="gauge-pct" id="gauge-pct-text">0%</div>
+            <div class="gauge-label">Miles Driven on FSD</div>
+          </div>
+        </div>
+        <div class="gauge-scale"><span>0</span><span>100</span></div>
+      `;
+    }
+
     async function loadStats() {
       const content = document.getElementById('content');
       try {
@@ -100,10 +148,7 @@
           : 'unknown';
 
         content.innerHTML = `
-          <div class="hero">
-            <div class="pct">${stats.percent}<span class="sign">%</span></div>
-            <div class="label">Miles Driven on FSD</div>
-          </div>
+          ${buildGauge(stats.percent)}
           <div class="grid">
             <div class="card">
               <div class="label">FSD Miles</div>
@@ -115,15 +160,15 @@
             </div>
           </div>
           <p class="updated">Last updated: ${updated}</p>
-          <p class="refresh-note">Updates automatically whenever your car reports new stats</p>
         `;
+
+        animateGauge(stats.percent);
       } catch (err) {
         content.innerHTML = '<div class="empty">Couldn\'t load stats right now.</div>';
       }
     }
 
     loadStats();
-    // Refresh the view every 60s in case new data has arrived since page load
     setInterval(loadStats, 60000);
   </script>
 </body>
