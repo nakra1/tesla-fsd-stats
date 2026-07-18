@@ -42,10 +42,6 @@
   .gauge-label{
     font-size:13px; color:var(--dim); margin-top:6px;
   }
-  .gauge-scale{
-    display:flex; justify-content:space-between; max-width:220px; margin:0 auto;
-    font-size:12px; color:var(--dim);
-  }
 
   .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:28px; }
   .card{
@@ -115,6 +111,8 @@
     }
 
     function buildGauge(percent) {
+      const startPt = polarToCartesian(100, 100, 104, GAUGE_START);
+      const endPt = polarToCartesian(100, 100, 104, GAUGE_START + GAUGE_SWEEP);
       return `
         <div class="gauge-wrap">
           <svg width="280" height="280" viewBox="0 0 200 200">
@@ -122,13 +120,16 @@
                   fill="none" stroke="var(--track)" stroke-width="14" stroke-linecap="round"/>
             <path id="gauge-fill" d="${describeArc(100, 100, 82, GAUGE_START, GAUGE_START)}"
                   fill="none" stroke="var(--accent)" stroke-width="14" stroke-linecap="round"/>
+            <text x="${startPt.x}" y="${startPt.y}" text-anchor="middle" font-size="11"
+                  fill="var(--dim)" font-family="-apple-system, sans-serif">0</text>
+            <text x="${endPt.x}" y="${endPt.y}" text-anchor="middle" font-size="11"
+                  fill="var(--dim)" font-family="-apple-system, sans-serif">100</text>
           </svg>
           <div class="gauge-center">
             <div class="gauge-pct" id="gauge-pct-text">0%</div>
             <div class="gauge-label">Miles Driven on FSD</div>
           </div>
         </div>
-        <div class="gauge-scale"><span>0</span><span>100</span></div>
       `;
     }
 
