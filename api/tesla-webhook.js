@@ -37,13 +37,39 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, type: "state_ping" });
     }
 
-    if (!data.MilesSinceReset || !data.SelfDrivingMilesSinceReset) {
-      console.warn("Data payload missing expected fields:", JSON.stringify(data));
-      return res.status(400).json({ error: "Missing expected fields" });
+    // Teslemetry reports fields independently as they update — a single payload
+    // may contain only one of the two fields we care about, not both together.
+    // Merge whatever arrives with whatever we already have stored.
+    const hasMiles = data.MilesSinceReset !== undefined;
+    const hasSelfDriving = data.SelfDrivingMilesSinceReset !== undefined;
+
+    if (!hasMiles && !hasSelfDriving) {
+      // Payload had a data object, but not either field we track — nothing to do.
+      return res.status(200).json({ ok: true, type: "unrelated_field" });
     }
 
-    const milesSinceReset = parseFloat(data.MilesSinceReset);
-    const selfDrivingMiles = parseFloat(data.SelfDrivingMilesSinceReset);
+    const existing = (await redis.get("tesla:fsd-stats")) || {};
+
+    const milesSinceReset = hasMiles
+      ? parseFloat(data.MilesSinceReset)
+      : existing.milesSinceReset;
+    const selfDrivingMiles = hasSelfDriving
+      ? parseFloat(data.SelfDrivingMilesSinceReset)
+      : existing.selfDrivingMiles;
+
+    if (milesSinceReset === undefined || selfDrivingMiles === undefined) {
+      // We have one field now but have never received the other one yet —
+      // not enough to compute a percentage. Store what we have and wait.
+      await redis.set("tesla:fsd-stats", {
+        ...existing,
+        ...(hasMiles && { milesSinceReset }),
+        ...(hasSelfDriving && { selfDrivingMiles }),
+        vin: vin || existing.vin || null,
+        updatedAt: createdAt || new Date().toISOString(),
+      });
+      return res.status(200).json({ ok: true, type: "partial_data_stored" });
+    }
+
     const percent =
       milesSinceReset > 0
         ? Math.round((selfDrivingMiles / milesSinceReset) * 1000) / 10
@@ -53,7 +79,7 @@ export default async function handler(req, res) {
       milesSinceReset,
       selfDrivingMiles,
       percent,
-      vin: vin || null,
+      vin: vin || existing.vin || null,
       updatedAt: createdAt || new Date().toISOString(),
     });
 
