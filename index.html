@@ -20,7 +20,7 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     min-height:100vh;
   }
-  .wrap{ max-width:480px; margin:0 auto; padding:32px 20px 48px; }
+  .wrap{ max-width:480px; margin:0 auto; padding:32px 12px 48px; }
 
   header{ margin-bottom:8px; text-align:center; }
   .eyebrow{
@@ -46,13 +46,14 @@
   .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:28px; }
   .card{
     background:var(--panel); border:1px solid var(--line); border-radius:12px;
-    padding:16px;
+    padding:16px 10px; text-align:center;
   }
   .card .label{ font-size:11px; color:var(--dim); letter-spacing:.06em; text-transform:uppercase; }
   .card .value{
-    font-size:20px; margin-top:6px; font-weight:600;
+    font-size:clamp(16px, 5.5vw, 20px); margin-top:6px; font-weight:600;
+    white-space:nowrap;
   }
-  .card .unit{ font-size:12px; color:var(--dim); margin-left:3px; font-weight:400; }
+  .card .unit{ font-size:12px; color:var(--dim); margin-left:2px; font-weight:400; }
 
   .updated{
     text-align:center; font-size:12px; color:var(--dim); margin-top:22px;
@@ -170,7 +171,6 @@
     }
 
     loadStats();
-    setInterval(loadStats, 60000);
   </script>
 </body>
 </html>
